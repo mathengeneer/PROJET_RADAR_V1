@@ -57,7 +57,7 @@ async def run_radar():
     
     # Étape B : Analyse intelligente par Gemini
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = genai.GenerativeModel('gemini-pro')
         prompt = f"""
         Tu es un expert en recrutement BTP et Génie Civil au Maroc. 
         Voici des données brutes de sites d'emploi :
