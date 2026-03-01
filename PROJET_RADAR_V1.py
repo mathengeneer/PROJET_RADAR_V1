@@ -11,7 +11,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 # Configuration de Google Gemini (Version stable forcée)
 genai.configure(api_key=GEMINI_API_KEY, transport='rest')
-model = genai.GenerativeModel('models/gemini-1.5-flash')
+model = genai.GenerativeModel('models/gemini-2.0-flash')
 async def envoyer_alerte(message):
     """Envoie le message de l'IA sur ton Telegram."""
     bot = Bot(token=TELEGRAM_TOKEN)
