@@ -11,8 +11,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 
 # Configuration de Google Gemini (Version stable forcée)
 genai.configure(api_key=GEMINI_API_KEY, transport='rest')
-model = genai.GenerativeModel('gemini-1.5-flash-8b')
-
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 async def envoyer_alerte(message):
     """Envoie le message de l'IA sur ton Telegram."""
     bot = Bot(token=TELEGRAM_TOKEN)
@@ -33,32 +32,22 @@ def simulation_scan():
     - Mission C : Calculateur Charpente Métallique - Bordeaux.
     - Mission D : Vendeur de fleurs - Nice (Ne devrait pas être retenu).
     """
-
 async def executer_radar():
-    print("🔎 Scan en cours...")
-    offres_brutes = simulation_scan()
-
-    prompt = f"""
-    Analyse ces offres : {offres_brutes}
-    Garde uniquement celles liées au Génie Civil ou aux Structures.
-    Fais un résumé très court par offre (Poste et Ville).
-    Si rien ne correspond, réponds : RIEN.
-    """
-
+    print("--- Diagnostic des modèles disponibles ---")
     try:
-        # Appel à l'IA Gemini
-        response = model.generate_content(prompt)
-        analyse = response.text
-
-        if "RIEN" not in analyse.upper():
-            await envoyer_alerte(analyse)
-        else:
-            print("📭 Aucune mission pertinente aujourd'hui.")
-            
+        import google.generativeai as genai
+        import os
+        
+        # Configuration de la clé pour le diagnostic
+        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        
+        # On liste tous les modèles accessibles
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f"✅ Modèle disponible : {m.name}")
+                
     except Exception as e:
-        error_msg = f"⚠️ Erreur lors de l'analyse IA : {str(e)}"
-        print(error_msg)
-        await envoyer_alerte(error_msg)
+        print(f"❌ Erreur lors du listage : {e}")
 
 if __name__ == "__main__":
     # Lancement du script en mode asynchrone
