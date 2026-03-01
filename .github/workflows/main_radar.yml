@@ -19,8 +19,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Installer les bibliotheques
-        run: pip install -U google-generativeai python-telegram-bot requests beautifulsoup4
+      - name: Install libs
+        run: pip install --upgrade google-generativeai python-telegram-bot
 
       - name: Executer le script Radar
         env:

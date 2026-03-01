@@ -33,21 +33,33 @@ def simulation_scan():
     - Mission D : Vendeur de fleurs - Nice (Ne devrait pas être retenu).
     """
 async def executer_radar():
-    print("--- Diagnostic des modèles disponibles ---")
+    print("🔎 Scan en cours...")
+    offres_brutes = simulation_scan()
+
+    prompt = f"""
+    Analyse ces offres : {offres_brutes}
+    Garde uniquement celles liées au Génie Civil ou aux Structures.
+    Fais un résumé très court par offre (Poste et Ville).
+    Si rien ne correspond, réponds : RIEN.
+    """
+
     try:
-        import google.generativeai as genai
-        import os
+        # Configuration du modèle validé par ton diagnostic
+        model = genai.GenerativeModel('models/gemini-2.0-flash')
         
-        # Configuration de la clé pour le diagnostic
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-        
-        # On liste tous les modèles accessibles
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                print(f"✅ Modèle disponible : {m.name}")
-                
+        response = model.generate_content(prompt)
+        analyse = response.text
+
+        if "RIEN" not in analyse.upper():
+            await envoyer_alerte(analyse)
+        else:
+            print("📭 Aucune mission pertinente aujourd'hui.")
+            
     except Exception as e:
-        print(f"❌ Erreur lors du listage : {e}")
+        error_msg = f"⚠️ Erreur lors de l'analyse IA : {str(e)}"
+        print(error_msg)
+        # On envoie l'erreur sur Telegram pour être alerté immédiatement
+        await envoyer_alerte(error_msg)
 
 if __name__ == "__main__":
     # Lancement du script en mode asynchrone
