@@ -2,8 +2,9 @@ name: Workflow_Radar_V1
 
 on:
   schedule:
-    # S'exécute à la minute 0 de chaque heure (ex: 13:00, 14:00...)
-    - cron: '0 * * * *'
+    # # Se lance 5 fois par jour (toutes les 4h45 environ, ou aux heures choisies)
+    # Ici : 08h00, 11h00, 14h00, 17h00 et 20h00 (Heure UTC)
+    - cron: '0 8,11,14,17,20 * * *'
   # Permet de lancer le radar manuellement pour tester
   workflow_dispatch:
 
