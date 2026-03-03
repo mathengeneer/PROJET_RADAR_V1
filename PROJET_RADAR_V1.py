@@ -5,10 +5,11 @@ from mistralai import Mistral
 from telegram import Bot
 from googlesearch import search
 
-# Configuration des API
+# --- CONFIGURATION (Noms harmonisés) ---
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("CHAT_ID")
+# Ici, on utilise CHAT_ID comme nom de variable pour correspondre au bas du code
+CHAT_ID = os.environ.get("CHAT_ID") 
 
 client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -36,11 +37,17 @@ async def analyser_avec_mistral(url):
         return f"Erreur Mistral sur {url}: {e}"
 
 async def executer_radar():
-    print("🚀 Démarrage du Radar...")
+    print(f"🚀 Démarrage du Radar... ID utilisé: {CHAT_ID}")
+    
+    if not CHAT_ID:
+        print("❌ ERREUR : La variable CHAT_ID est vide. Vérifie tes Secrets GitHub !")
+        return
+
     offres = chercher_offres()
     
     if not offres:
-        await bot.send_message(chat_id=str(CHAT_ID), text="✅ Scan terminé : Le radar est bien connecté !")
+        # Ici str(CHAT_ID) fonctionnera car CHAT_ID est défini en haut
+        await bot.send_message(chat_id=str(CHAT_ID), text="✅ Scan terminé : Le radar est connecté mais aucune nouvelle offre trouvée.")
         return
 
     message_final = "🏗️ **NOUVELLES OFFRES GÉNIE CIVIL** 🏗️\n\n"
@@ -48,7 +55,7 @@ async def executer_radar():
     for url in offres:
         analyse = await analyser_avec_mistral(url)
         message_final += f"🔗 {url}\n📝 {analyse}\n\n"
-        time.sleep(1) # Sécurité pour ne pas saturer
+        time.sleep(1) 
 
     await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
     print("✅ Message envoyé sur Telegram !")
