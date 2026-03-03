@@ -32,7 +32,7 @@ async def analyser_avec_mistral(url):
             model="mistral-tiny",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.contentgit add .
+        return response.choices[0].message.content
     except Exception as e:
         return f"Erreur Mistral sur {url}: {e}"
 
