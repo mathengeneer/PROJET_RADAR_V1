@@ -8,7 +8,7 @@ from googlesearch import search
 # Configuration des API
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_ID = os.environ.get("CHAT_ID")
 
 client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
@@ -40,7 +40,7 @@ async def executer_radar():
     offres = chercher_offres()
     
     if not offres:
-        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text="✅ Scan terminé : Aucune nouvelle offre trouvée.")
+        await bot.send_message(chat_id=str(CHAT_ID), text="✅ Scan terminé : Le radar est bien connecté !")
         return
 
     message_final = "🏗️ **NOUVELLES OFFRES GÉNIE CIVIL** 🏗️\n\n"
@@ -50,7 +50,7 @@ async def executer_radar():
         message_final += f"🔗 {url}\n📝 {analyse}\n\n"
         time.sleep(1) # Sécurité pour ne pas saturer
 
-    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message_final, parse_mode='Markdown')
+    await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
     print("✅ Message envoyé sur Telegram !")
 
 if __name__ == "__main__":
