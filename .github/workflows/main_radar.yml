@@ -1,31 +1,28 @@
-name: Workflow_Radar_V1
+name: Radar Genie Civil
 
 on:
   schedule:
-    # # Se lance 5 fois par jour (toutes les 4h45 environ, ou aux heures choisies)
-    # Ici : 08h00, 11h00, 14h00, 17h00 et 20h00 (Heure UTC)
-    - cron: '0 8,11,14,17,20 * * *'
-  # Permet de lancer le radar manuellement pour tester
-  workflow_dispatch:
+    - cron: '0 8,11,14,17,20 * * *' # 5 fois par jour
+  workflow_dispatch: # Pour lancer manuellement
 
 jobs:
   job-radar:
     runs-on: ubuntu-latest
     steps:
-      - name: Recuperer le code du depot
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Installer Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Install libs
-        run: pip install --upgrade google-generativeai python-telegram-bot
+        run: pip install mistralai python-telegram-bot googlesearch-python
 
-      - name: Executer le script Radar
+      - name: Run script
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python PROJET_RADAR_V1.py 
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python PROJET_RADAR_V1.py
