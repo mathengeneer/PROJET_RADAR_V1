@@ -15,14 +15,23 @@ client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def chercher_offres():
-    print("🔎 Recherche d'offres réelles sur Google...")
-    query = '"Génie Civil" (CDI OR "offre d\'emploi") France' 
+    print("🔎 Tentative de recherche Google...")
+    # Requête simplifiée
+    query = 'recrutement "génie civil" France'
     liens = []
     try:
-        for url in search(query, num_results=5, lang="fr"):
+        # On limite à 3 résultats pour tester la connexion
+        # On ajoute un délai (sleep_interval) pour ne pas être banni par Google
+        resultats = search(query, num_results=3, lang="fr", sleep_interval=5)
+        
+        for url in resultats:
+            print(f"🔗 Lien trouvé : {url}")
             liens.append(url)
+            
     except Exception as e:
-        print(f"Erreur recherche : {e}")
+        print(f"❌ Erreur lors de la recherche : {e}")
+        
+    print(f"📊 Nombre de liens récupérés : {len(liens)}")
     return liens
 
 async def analyser_avec_mistral(url):
