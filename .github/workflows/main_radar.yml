@@ -18,8 +18,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install libs
-        run: pip install mistralai python-telegram-bot googlesearch-python
-
+        run: pip install mistralai python-telegram-bot requests beautifulsoup4
+        
       - name: Run script
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
