@@ -16,7 +16,7 @@ bot = Bot(token=TELEGRAM_TOKEN)
 
 def chercher_offres():
     print("🔎 Recherche d'offres réelles sur Google...")
-  query = '"Génie Civil" (CDI OR "offre d\'emploi") France' 
+    query = '"Génie Civil" (CDI OR "offre d\'emploi") France' 
     liens = []
     try:
         for url in search(query, num_results=5, lang="fr"):
@@ -32,7 +32,7 @@ async def analyser_avec_mistral(url):
             model="mistral-tiny",
             messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.content
+        return response.choices[0].message.contentgit add .
     except Exception as e:
         return f"Erreur Mistral sur {url}: {e}"
 
