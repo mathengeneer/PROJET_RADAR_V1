@@ -16,7 +16,7 @@ bot = Bot(token=TELEGRAM_TOKEN)
 
 def chercher_offres():
     print("🔎 Recherche d'offres réelles sur Google...")
-    query = '"Génie Civil" (CDI OR "offre d\'emploi") France after:2026-02-20'
+  query = '"Génie Civil" (CDI OR "offre d\'emploi") France' 
     liens = []
     try:
         for url in search(query, num_results=5, lang="fr"):
