@@ -24,5 +24,7 @@ jobs:
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # ATTENTION ICI : Le nom à gauche doit être CHAT_ID
+          # Le nom à droite doit être le nom EXACT de ton secret sur GitHub
+          CHAT_ID: ${{ secrets.CHAT_ID }} 
         run: python PROJET_RADAR_V1.py

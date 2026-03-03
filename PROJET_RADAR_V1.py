@@ -8,8 +8,8 @@ from googlesearch import search
 # --- CONFIGURATION (Noms harmonisés) ---
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-# Ici, on utilise CHAT_ID comme nom de variable pour correspondre au bas du code
-CHAT_ID = os.environ.get("CHAT_ID") 
+# Il cherche CHAT_ID, et s'il ne trouve pas, il cherche TELEGRAM_CHAT_ID
+CHAT_ID = os.environ.get("CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
 
 client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
