@@ -1,10 +1,12 @@
 import os
 import asyncio
 import requests
+import time
 from bs4 import BeautifulSoup
 from mistralai import Mistral
 from telegram import Bot
 
+# --- CONFIGURATION DES ACCÈS ---
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
@@ -12,98 +14,114 @@ CHAT_ID = os.environ.get("CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
 client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
 
+# --- FONCTION 1 : LE SNIPER UPWORK (Missions Freelance) ---
 def scanner_upwork():
-    # Flux RSS public d'Upwork pour le Génie Civil / Autocad
-    url = "https://www.upwork.com/ab/feed/jobs/rss?q=civil+engineering+OR+autocad&sort=recency"
+    # Recherche élargie : Civil Engineering, Structural, AutoCAD, Revit
+    url = "https://www.upwork.com/ab/feed/jobs/rss?q=%22civil+engineering%22+OR+structural+OR+autocad+OR+revit&sort=recency"
     print("🎯 Scan des missions Upwork en cours...")
     missions = []
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        response = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'xml') # On utilise le parseur XML pour le RSS
         
-        # Récupère les 2 offres les plus récentes
-        items = soup.find_all('item')[:2]
+        items = soup.find_all('item')[:3] # On prend les 3 plus récentes
         for item in items:
-            title = item.title.text if item.title else "Mission"
-            link = item.link.text if item.link else ""
-            desc = item.description.text[:800] if item.description else ""
-            missions.append({'source': 'Upwork (Plateforme Freelance)', 'titre': title, 'lien': link, 'texte': desc})
+            missions.append({
+                'source': 'Upwork (Freelance)',
+                'titre': item.title.text if item.title else "Mission Upwork",
+                'lien': item.link.text if item.link else "",
+                'texte': item.description.text[:1000] if item.description else ""
+            })
     except Exception as e:
-        print(f"Erreur Upwork: {e}")
+        print(f"⚠️ Erreur Upwork: {e}")
     return missions
 
+# --- FONCTION 2 : LE HACK LINKEDIN (Réseau B2B via DuckDuckGo) ---
 def scanner_reseau_linkedin():
-    # Technique "Dorking" via DuckDuckGo pour fouiller dans les posts LinkedIn sans être bloqué
-    print("🕵️‍♂️ Hack Recherche LinkedIn en cours...")
+    print("🕵️‍♂️ Recherche d'opportunités sur les posts LinkedIn...")
     url = 'https://html.duckduckgo.com/html/'
-    # La requête magique
-    payload = {'q': 'site:linkedin.com/posts "génie civil" ("recherche" OR "freelance" OR "besoin")'}
+    # Requête élargie : Génie Civil ou BTP + recherche d'indépendant/mission
+    query = 'site:linkedin.com/posts "génie civil" OR "BTP" ("freelance" OR "mission" OR "indépendant" OR "recherche consultant")'
+    payload = {'q': query}
     missions = []
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.post(url, data=payload, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Récupère les 2 premiers posts pertinents
-        results = soup.find_all('div', class_='result__body')[:2]
+        results = soup.find_all('div', class_='result__body')[:3]
         for res in results:
-            title_tag = res.find('a', class_='result__url')
+            link_tag = res.find('a', class_='result__url')
             snippet_tag = res.find('a', class_='result__snippet')
-            if title_tag and snippet_tag:
+            if link_tag and snippet_tag:
                 missions.append({
                     'source': 'LinkedIn (Réseau B2B)',
-                    'titre': title_tag.text.strip(),
-                    'lien': title_tag.get('href'),
+                    'titre': link_tag.text.strip()[:100],
+                    'lien': link_tag.get('href'),
                     'texte': snippet_tag.text.strip()
                 })
     except Exception as e:
-        print(f"Erreur DDG: {e}")
+        print(f"⚠️ Erreur LinkedIn via DDG: {e}")
     return missions
 
+# --- FONCTION 3 : L'IA BUSINESS DEVELOPER ---
 async def analyser_et_vendre(mission):
-    # Le nouveau rôle de Mistral : Ton Business Developer
     prompt = f"""
-    Tu es mon assistant en Business Development. Voici une opportunité trouvée sur le web :
+    En tant qu'expert en business development BTP, analyse cette opportunité :
+    Source: {mission['source']}
     Titre: {mission['titre']}
-    Détails: {mission['texte']}
+    Contenu: {mission['texte']}
     
-    Fais-moi un résumé ULTRA COURT :
-    1. 🚨 Le vrai besoin du client (Ex: Il est bloqué sur des plans AutoCAD).
-    2. 💡 Une idée de phrase d'accroche (brise-glace) très directe et percutante que je peux lui envoyer en message privé pour proposer mes services en freelance.
-    Ne réponds que par ces deux points, sois concis et vendeur.
+    Réponds de manière concise (max 100 mots) :
+    1. 🚨 BESOIN : Quel est le problème urgent du client ?
+    2. 💡 ACCROCHE : Propose une phrase brise-glace percutante pour que je propose mes services de consultant/freelance.
     """
     try:
         response = client.chat.complete(model="mistral-tiny", messages=[{"role": "user", "content": prompt}])
-        analyse = response.choices[0].message.content
-        return f"**{mission['titre']}**\n🔗 {mission['lien']}\n\n{analyse}"
+        return response.choices[0].message.content
     except Exception as e:
-        return f"Erreur Mistral: {e}"
+        return f"Analyse indisponible : {e}"
 
+# --- FONCTION PRINCIPALE : LE RADAR ---
 async def executer_radar():
-    print(f"🚀 Démarrage du Radar Chasseur... ID: {CHAT_ID}")
+    print(f"🚀 Démarrage du Radar Chasseur de Primes... ID: {CHAT_ID}")
     
-    # On rassemble les missions d'Upwork et de LinkedIn
-    toutes_les_missions = scanner_upwork() + scanner_reseau_linkedin()
+    # 1. CRÉATION D'UNE MISSION DE TEST (Pour vérifier que tout marche)
+    missions_trouvees = [{
+        'source': 'SYSTÈME (Test)',
+        'titre': 'Consultant Structure Béton - Mission Urgente',
+        'lien': 'https://www.linkedin.com',
+        'texte': 'Besoin de renfort pour calculs de descentes de charges Eurocodes sur un projet résidentiel.'
+    }]
     
-    if not toutes_les_missions:
-        await bot.send_message(chat_id=str(CHAT_ID), text="🕵️‍♂️ Radar actif : Aucune mission détectée sur cette session. Je relance au prochain cycle !")
-        return
-
-    message_final = "💰 **OPPORTUNITÉS FREELANCE/CONSULTING** 💰\n\n"
+    # 2. COLLECTE DES VRAIES MISSIONS
+    missions_trouvees += scanner_upwork()
+    missions_trouvees += scanner_reseau_linkedin()
     
-    for mission in toutes_les_missions:
+    message_final = "💰 **RADAR BUSINESS : OPPORTUNITÉS DETECTÉES** 💰\n\n"
+    
+    # 3. ANALYSE ET ENVOI
+    for mission in missions_trouvees:
+        print(f"Analyse de : {mission['titre']}")
         analyse = await analyser_et_vendre(mission)
-        message_final += f"🏢 **SOURCE : {mission['source']}**\n{analyse}\n\n"
-        message_final += "──────────────\n"
-        await asyncio.sleep(2) # Stabilité
-
-    # Sécurité pour ne pas dépasser la limite de texte de Telegram
-    if len(message_final) > 4000:
-        message_final = message_final[:4000] + "...\n(Tronqué)"
+        
+        bloc = f"🏢 **{mission['source']}**\n"
+        bloc += f"📌 **{mission['titre']}**\n"
+        bloc += f"🔗 {mission['lien']}\n"
+        bloc += f"{analyse}\n"
+        bloc += "───────────────────\n"
+        
+        # On vérifie la taille du message pour Telegram (max 4096 car.)
+        if len(message_final + bloc) > 4000:
+            await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
+            message_final = ""
+        
+        message_final += bloc
+        await asyncio.sleep(1) # Pause pour éviter le spam
 
     await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
-    print("✅ Rapport opportunités envoyé !")
+    print("✅ Session terminée. Message envoyé !")
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
