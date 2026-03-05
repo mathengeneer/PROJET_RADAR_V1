@@ -22,13 +22,12 @@ def scanner_jooble():
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
-        # On cherche les blocs d'offres (sélecteur simplifié pour la robustesse)
-        articles = soup.find_all('article')[:2]
+        articles = soup.find_all('article')[:3]
         for art in articles:
             link = art.find('a')
             if link:
                 opportunites.append({
-                    'source': '🛠️ JOOBLE (Missions & Sous-traitance)',
+                    'source': '🛠️ JOOBLE (Sous-traitance)',
                     'titre': link.text.strip(),
                     'lien': link.get('href'),
                     'texte': art.text.strip()[:500]
@@ -38,6 +37,7 @@ def scanner_jooble():
     return opportunites
 
 def scanner_marches_publics():
+    """Cible les entreprises qui viennent de gagner des chantiers"""
     print("🎯 Recherche d'attributions de marchés publics...")
     url = 'https://html.duckduckgo.com/html/'
     query = 'site:francemarches.com "attribution" ("génie civil" OR "gros oeuvre") 2026'
@@ -63,6 +63,7 @@ def scanner_marches_publics():
     return opportunites
 
 def scanner_upwork():
+    """Cible les missions freelance mondiales"""
     url = "https://www.upwork.com/ab/feed/jobs/rss?q=%22civil+engineering%22+OR+structural+OR+eurocodes&sort=recency"
     missions = []
     try:
@@ -82,47 +83,59 @@ def scanner_upwork():
     return missions
 
 async def analyser_opportunite(item):
-    prompt = f"""Analyse cette opportunité BTP ({item['source']}) : {item['titre']} - {item['texte']}.
-    1. 🎯 L'ENJEU : Pourquoi un freelance/consultant est utile ici ?
+    """L'IA prépare ton approche commerciale de façon SYNTHÉTIQUE"""
+    prompt = f"""Analyse RAPIDEMENT (max 500 caractères) cette opportunité BTP : {item['titre']} - {item['texte']}.
+    1. 🎯 L'ENJEU : Pourquoi un expert est utile ?
     2. 💬 L'ACCROCHE : Une phrase d'expert pour décrocher un RDV."""
     try:
         response = client.chat.complete(model="mistral-tiny", messages=[{"role": "user", "content": prompt}])
-        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{response.choices[0].message.content}"
+        content = response.choices[0].message.content
+        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{content}"
     except:
-        return f"Erreur IA sur {item['titre']}"
+        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n(Analyse IA indisponible)"
 
 async def executer_radar():
-    print(f"🚀 Sniper V3 (Jooble + MP + Upwork) lancé...")
+    print(f"🚀 Sniper V3.1 (Correctif Anti-Crash) lancé...")
     
-    # On récupère toutes les données
+    # Récupération des données
     data = scanner_marches_publics() + scanner_upwork() + scanner_jooble()
     
+    # Mission de test si rien n'est trouvé
     if not data:
-        data = [{'source': '💡 TEST', 'titre': 'Ingénieur Structure', 'lien': 'http://google.com', 'texte': 'Test système'}]
+        data = [{
+            'source': '💡 TEST SYSTÈME', 
+            'titre': 'Ingénieur Structure Indépendant', 
+            'lien': 'http://google.com', 
+            'texte': 'Vérification de notes de calcul béton armé.'
+        }]
 
-    # ON LIMITE AUX 5 MEILLEURES OPPORTUNITÉS pour éviter de saturer Telegram
-    data = data[:5]
+    # On limite à 4 résultats pour ne pas saturer le workflow
+    data = data[:4]
 
-    header = "🏗️ **RADAR BUSINESS : ÉDITION 3H** 🏗️\n\n"
-    message_final = header
-    
     for opport in data:
         analyse = await analyser_opportunite(opport)
-        bloc = f"{analyse}\n\n──────────────\n\n"
         
-        # SÉCURITÉ : Si l'ajout du bloc dépasse la limite de Telegram (4096 car.)
-        if len(message_final) + len(bloc) > 4000:
-            # On envoie ce qu'on a déjà et on recommence un nouveau message
-            await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
-            message_final = header + " (Suite)...\n\n" + bloc
-        else:
-            message_final += bloc
+        # Envoi d'un message par opportunité (évite l'erreur "Message too long")
+        header = "🏗️ **RADAR BUSINESS : OPPORTUNITÉ** 🏗️\n\n"
         
-        await asyncio.sleep(1)
+        try:
+            # Sécurité : on tronque à 3800 caractères au cas où
+            texte_final = (header + analyse)[:3800]
+            await bot.send_message(
+                chat_id=str(CHAT_ID), 
+                text=texte_final, 
+                parse_mode='Markdown'
+            )
+            print(f"✅ Alerte envoyée : {opport['titre'][:30]}...")
+        except Exception as e:
+            # En cas d'erreur de formatage Markdown, on envoie en texte brut
+            print(f"⚠️ Erreur Markdown, envoi en texte brut : {e}")
+            await bot.send_message(chat_id=str(CHAT_ID), text=texte_final)
+        
+        # Pause pour respecter les limites de Telegram
+        await asyncio.sleep(2)
 
-    # Envoi du dernier bloc (ou du message complet s'il est court)
-    await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
-    print("✅ Rapport Sniper envoyé sur Telegram !")
+    print("✅ Session de scan terminée !")
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
