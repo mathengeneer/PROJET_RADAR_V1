@@ -93,18 +93,36 @@ async def analyser_opportunite(item):
 
 async def executer_radar():
     print(f"🚀 Sniper V3 (Jooble + MP + Upwork) lancé...")
+    
+    # On récupère toutes les données
     data = scanner_marches_publics() + scanner_upwork() + scanner_jooble()
     
     if not data:
         data = [{'source': '💡 TEST', 'titre': 'Ingénieur Structure', 'lien': 'http://google.com', 'texte': 'Test système'}]
 
-    message_final = "🏗️ **RADAR BUSINESS : ÉDITION 3H** 🏗️\n\n"
+    # ON LIMITE AUX 5 MEILLEURES OPPORTUNITÉS pour éviter de saturer Telegram
+    data = data[:5]
+
+    header = "🏗️ **RADAR BUSINESS : ÉDITION 3H** 🏗️\n\n"
+    message_final = header
+    
     for opport in data:
         analyse = await analyser_opportunite(opport)
-        message_final += f"{analyse}\n\n──────────────\n\n"
-        await asyncio.sleep(2)
+        bloc = f"{analyse}\n\n──────────────\n\n"
+        
+        # SÉCURITÉ : Si l'ajout du bloc dépasse la limite de Telegram (4096 car.)
+        if len(message_final) + len(bloc) > 4000:
+            # On envoie ce qu'on a déjà et on recommence un nouveau message
+            await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
+            message_final = header + " (Suite)...\n\n" + bloc
+        else:
+            message_final += bloc
+        
+        await asyncio.sleep(1)
 
+    # Envoi du dernier bloc (ou du message complet s'il est court)
     await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
+    print("✅ Rapport Sniper envoyé sur Telegram !")
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
