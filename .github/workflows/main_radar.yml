@@ -1,30 +1,28 @@
-name: Radar Genie Civil
+name: Radar Business BTP
 
 on:
   schedule:
-    - cron: '0 8,11,14,17,20 * * *' # 5 fois par jour
-  workflow_dispatch: # Pour lancer manuellement
+    - cron: '0 */3 * * *'  # S'exécute à 00:00, 03:00, 06:00, 09:00, etc.
+  workflow_dispatch:        # Permet de le lancer à la main pour tester
 
 jobs:
-  job-radar:
+  run-radar:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
       - name: Install libs
-        run: pip install mistralai python-telegram-bot requests beautifulsoup4
-        
+        run: pip install mistralai python-telegram-bot requests beautifulsoup4 lxml
+
       - name: Run script
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          # ATTENTION ICI : Le nom à gauche doit être CHAT_ID
-          # Le nom à droite doit être le nom EXACT de ton secret sur GitHub
-          CHAT_ID: ${{ secrets.CHAT_ID }} 
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python PROJET_RADAR_V1.py
