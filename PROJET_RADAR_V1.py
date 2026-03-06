@@ -14,9 +14,10 @@ client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
 
 def scanner_jooble():
-    """Aspire les offres de sous-traitance et missions BTP via Jooble"""
-    print("🎯 Recherche sur Jooble (Sous-traitance BTP)...")
-    url = 'https://fr.jooble.org/SearchResult?ukw=g%C3%A9nie%20civil%20sous-traitance'
+    """Version Turbo : Balaye large sur le BTP et la Structure"""
+    print("🎯 Scan Jooble élargi...")
+    query = "ingénieur structure OR béton armé OR charpente OR étude de prix"
+    url = f'https://fr.jooble.org/SearchResult?ukw={query}'
     opportunites = []
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -27,7 +28,7 @@ def scanner_jooble():
             link = art.find('a')
             if link:
                 opportunites.append({
-                    'source': '🛠️ JOOBLE (Sous-traitance)',
+                    'source': '🛠️ JOOBLE (Besoin Technique)',
                     'titre': link.text.strip(),
                     'lien': link.get('href'),
                     'texte': art.text.strip()[:500]
@@ -37,17 +38,17 @@ def scanner_jooble():
     return opportunites
 
 def scanner_marches_publics():
-    """Cible les entreprises qui viennent de gagner des chantiers"""
-    print("🎯 Recherche d'attributions de marchés publics...")
+    """Version Turbo : Cherche les attributions RÉCENTES sans limite d'année"""
+    print("🎯 Scan Marchés Publics (Attributions récentes)...")
     url = 'https://html.duckduckgo.com/html/'
-    query = 'site:francemarches.com "attribution" ("génie civil" OR "gros oeuvre") 2026'
+    query = 'site:francemarches.com "attribution" ("gros oeuvre" OR "structure" OR "maçonnerie")'
     payload = {'q': query}
     opportunites = []
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.post(url, data=payload, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
-        results = soup.find_all('div', class_='result__body')[:2]
+        results = soup.find_all('div', class_='result__body')[:3]
         for res in results:
             link = res.find('a', class_='result__url')
             snippet = res.find('a', class_='result__snippet')
@@ -62,12 +63,39 @@ def scanner_marches_publics():
         print(f"Erreur Marchés Publics: {e}")
     return opportunites
 
+def scanner_reseau_linkedin():
+    """Recherche de posts LinkedIn 'Besoin/Urgent'"""
+    print("🕵️‍♂️ Recherche de posts LinkedIn...")
+    url = 'https://html.duckduckgo.com/html/'
+    query = 'site:linkedin.com/posts "recherche freelance" OR "besoin renfort" ("structure" OR "BTP")'
+    payload = {'q': query}
+    missions = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.post(url, data=payload, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = soup.find_all('div', class_='result__body')[:2]
+        for res in results:
+            link = res.find('a', class_='result__url')
+            snippet = res.find('a', class_='result__snippet')
+            if link and snippet:
+                missions.append({
+                    'source': '👤 POST LINKEDIN (Direct)',
+                    'titre': link.text.strip()[:100],
+                    'lien': link.get('href'),
+                    'texte': snippet.text.strip()
+                })
+    except Exception as e:
+        print(f"Erreur LinkedIn: {e}")
+    return missions
+
 def scanner_upwork():
     """Cible les missions freelance mondiales"""
+    print("🌍 Scan Upwork...")
     url = "https://www.upwork.com/ab/feed/jobs/rss?q=%22civil+engineering%22+OR+structural+OR+eurocodes&sort=recency"
     missions = []
     try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, 'xml')
         items = soup.find_all('item')[:2]
@@ -83,59 +111,47 @@ def scanner_upwork():
     return missions
 
 async def analyser_opportunite(item):
-    """L'IA prépare ton approche commerciale de façon SYNTHÉTIQUE"""
-    prompt = f"""Analyse RAPIDEMENT (max 500 caractères) cette opportunité BTP : {item['titre']} - {item['texte']}.
-    1. 🎯 L'ENJEU : Pourquoi un expert est utile ?
-    2. 💬 L'ACCROCHE : Une phrase d'expert pour décrocher un RDV."""
+    """Mistral analyse et prépare l'argumentaire"""
+    prompt = f"""
+    Analyse cette opportunité BTP :
+    Source : {item['source']}
+    Titre : {item['titre']}
+    Contenu : {item['texte']}
+    
+    Réponds de manière très concise :
+    1. 🎯 **L'ENJEU** : Pourquoi un freelance/consultant en structure est vital ici (risques, délais) ?
+    2. 💬 **L'ACCROCHE** : Une phrase d'expert percutante pour décrocher un RDV avec le décideur.
+    """
     try:
         response = client.chat.complete(model="mistral-tiny", messages=[{"role": "user", "content": prompt}])
-        content = response.choices[0].message.content
-        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{content}"
-    except:
-        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n(Analyse IA indisponible)"
+        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{response.choices[0].message.content}"
+    except Exception as e:
+        return f"Erreur IA sur {item['titre']}: {e}"
 
 async def executer_radar():
-    print(f"🚀 Sniper V3.1 (Correctif Anti-Crash) lancé...")
+    print(f"🚀 Lancement du Radar Turbo... ID: {CHAT_ID}")
     
-    # Récupération des données
-    data = scanner_marches_publics() + scanner_upwork() + scanner_jooble()
+    # On lance les 4 filets en même temps
+    data = scanner_marches_publics() + scanner_upwork() + scanner_jooble() + scanner_reseau_linkedin()
     
-    # Mission de test si rien n'est trouvé
     if not data:
+        # La mission de test pour être sûr que la machine tourne
         data = [{
-            'source': '💡 TEST SYSTÈME', 
-            'titre': 'Ingénieur Structure Indépendant', 
-            'lien': 'http://google.com', 
-            'texte': 'Vérification de notes de calcul béton armé.'
+            'source': '💡 TEST SYSTÈME',
+            'titre': 'Ingénieur Structure Indépendant - Mission de Test',
+            'lien': 'http://google.com',
+            'texte': 'Ceci est un test pour vérifier que le radar de prospection B2B fonctionne correctement.'
         }]
 
-    # On limite à 4 résultats pour ne pas saturer le workflow
-    data = data[:4]
-
+    message_final = "🏗️ **RADAR BUSINESS : ÉDITION TURBO** 🏗️\n\n"
     for opport in data:
         analyse = await analyser_opportunite(opport)
-        
-        # Envoi d'un message par opportunité (évite l'erreur "Message too long")
-        header = "🏗️ **RADAR BUSINESS : OPPORTUNITÉ** 🏗️\n\n"
-        
-        try:
-            # Sécurité : on tronque à 3800 caractères au cas où
-            texte_final = (header + analyse)[:3800]
-            await bot.send_message(
-                chat_id=str(CHAT_ID), 
-                text=texte_final, 
-                parse_mode='Markdown'
-            )
-            print(f"✅ Alerte envoyée : {opport['titre'][:30]}...")
-        except Exception as e:
-            # En cas d'erreur de formatage Markdown, on envoie en texte brut
-            print(f"⚠️ Erreur Markdown, envoi en texte brut : {e}")
-            await bot.send_message(chat_id=str(CHAT_ID), text=texte_final)
-        
-        # Pause pour respecter les limites de Telegram
-        await asyncio.sleep(2)
+        message_final += f"{analyse}\n\n──────────────\n\n"
+        await asyncio.sleep(2) # Pause pour ne pas brusquer l'API Telegram
 
-    print("✅ Session de scan terminée !")
+    # Envoi final
+    await bot.send_message(chat_id=str(CHAT_ID), text=message_final[:4000], parse_mode='Markdown')
+    print("✅ Rapport envoyé sur Telegram !")
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
