@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from mistralai import Mistral
 from telegram import Bot
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION DES SECRETS ---
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
@@ -13,93 +13,173 @@ CHAT_ID = os.environ.get("CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
 client = Mistral(api_key=MISTRAL_API_KEY)
 bot = Bot(token=TELEGRAM_TOKEN)
 
-def scanner_flux_rss():
-    """Utilise les flux RSS (portes ouvertes) pour éviter les blocages anti-robots"""
-    print("📡 Scan des flux RSS professionnels...")
-    # Upwork est très fiable en RSS. On peut en ajouter d'autres ici.
-    urls = [
-        "https://www.upwork.com/ab/feed/jobs/rss?q=%22civil+engineering%22+OR+structural+OR+eurocodes&sort=recency"
-    ]
+# --- MOTEURS DE RECHERCHE ---
+
+def scanner_jooble():
+    """Cible les missions de sous-traitance sur Jooble"""
+    print("🎯 Scan Jooble...")
+    query = "ingénieur structure OR béton armé OR charpente OR étude de prix"
+    url = f'https://fr.jooble.org/SearchResult?ukw={query}'
     opportunites = []
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
-    for url in urls:
-        try:
-            response = requests.get(url, headers=headers, timeout=15)
-            # On utilise lxml pour parser le XML du flux RSS
-            soup = BeautifulSoup(response.text, 'xml')
-            items = soup.find_all('item')[:3]
-            for item in items:
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        articles = soup.find_all('article')[:3]
+        for art in articles:
+            link = art.find('a')
+            if link:
                 opportunites.append({
-                    'source': '📡 FLUX DIRECT (Upwork)',
-                    'titre': item.title.text.strip(),
-                    'lien': item.link.text.strip(),
-                    'texte': item.description.text.strip()[:500]
+                    'source': '🛠️ JOOBLE',
+                    'titre': link.text.strip(),
+                    'lien': link.get('href'),
+                    'texte': art.text.strip()[:500]
                 })
-        except Exception as e:
-            print(f"Erreur RSS: {e}")
+    except: pass
     return opportunites
 
-async def generer_prospect_ia():
-    """Si le web est vide, Mistral génère une cible stratégique (Lead Generation)"""
-    prompt = """
-    Donne-moi une fiche stratégique pour un ingénieur structure indépendant. 
-    Cible : Une entreprise majeure du BTP ou un Bureau d'Études en France (ex: Egis, Setec, Bouygues, Spie Batignolles).
-    Inclus : 
-    1. Pourquoi ils ont besoin de freelances en ce moment.
-    2. Comment les aborder sur LinkedIn (phrase d'accroche).
+def scanner_marches_publics():
+    """Détecte les attributions de marchés (Potentiels clients)"""
+    print("🎯 Scan Marchés Publics...")
+    url = 'https://html.duckduckgo.com/html/'
+    query = 'site:francemarches.com "attribution" ("gros oeuvre" OR "structure" OR "maçonnerie")'
+    payload = {'q': query}
+    opportunites = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.post(url, data=payload, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = soup.find_all('div', class_='result__body')[:3]
+        for res in results:
+            link = res.find('a', class_='result__url')
+            snippet = res.find('a', class_='result__snippet')
+            if link and snippet:
+                opportunites.append({
+                    'source': '🏢 MARCHÉ PUBLIC GAGNÉ',
+                    'titre': link.text.strip(),
+                    'lien': link.get('href'),
+                    'texte': snippet.text.strip()
+                })
+    except: pass
+    return opportunites
+
+def scanner_freework_btp():
+    """Cible les missions Freelance sur Free-Work France"""
+    print("🎯 Scan Free-Work...")
+    url = 'https://www.free-work.com/fr/tech-it/jobs?query=structure+btp'
+    opportunites = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        jobs = soup.find_all('h2')[:2] 
+        for job in jobs:
+            link = job.find_parent('a')
+            if link:
+                opportunites.append({
+                    'source': '🏗️ FREE-WORK (Mission)',
+                    'titre': job.text.strip(),
+                    'lien': "https://www.free-work.com" + link.get('href'),
+                    'texte': "Besoin technique détecté sur Free-Work."
+                })
+    except: pass
+    return opportunites
+
+def scanner_reseau_linkedin():
+    """Trouve des posts LinkedIn via DuckDuckGo"""
+    print("🎯 Scan LinkedIn...")
+    url = 'https://html.duckduckgo.com/html/'
+    query = 'site:linkedin.com/posts "recherche freelance" OR "besoin renfort" ("structure" OR "BTP")'
+    payload = {'q': query}
+    missions = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.post(url, data=payload, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = soup.find_all('div', class_='result__body')[:3]
+        for res in results:
+            link = res.find('a', class_='result__url')
+            snippet = res.find('a', class_='result__snippet')
+            if link and snippet:
+                missions.append({
+                    'source': '👤 POST LINKEDIN',
+                    'titre': link.text.strip()[:100],
+                    'lien': link.get('href'),
+                    'texte': snippet.text.strip()
+                })
+    except: pass
+    return missions
+
+def scanner_upwork():
+    """Missions internationales sur Upwork"""
+    print("🎯 Scan Upwork...")
+    url = "https://www.upwork.com/ab/feed/jobs/rss?q=%22civil+engineering%22+OR+structural+OR+eurocodes&sort=recency"
+    missions = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'xml')
+        items = soup.find_all('item')[:2]
+        for item in items:
+            missions.append({
+                'source': '🌍 UPWORK',
+                'titre': item.title.text,
+                'lien': item.link.text,
+                'texte': item.description.text[:500]
+            })
+    except: pass
+    return missions
+
+# --- ANALYSE IA AVEC PROTECTION ---
+
+async def analyser_opportunite(item):
+    """Prépare le script de vente avec Mistral"""
+    # Si le texte est vide (blocage LinkedIn), on envoie un message générique intelligent
+    description = item['texte'] if len(item['texte']) > 30 else "Analyse basée sur le titre (Contenu protégé)."
+    
+    prompt = f"""
+    Analyse cette opportunité BTP : {item['titre']}
+    Source : {item['source']}
+    Texte : {description}
+
+    1. 🎯 L'ENJEU : Pourquoi ont-ils besoin d'un expert en structure/génie civil ?
+    2. 💬 L'ACCROCHE : Une phrase d'expert pour décrocher un RDV.
     """
     try:
         response = client.chat.complete(model="mistral-tiny", messages=[{"role": "user", "content": prompt}])
-        return {
-            'source': '💡 CIBLE STRATÉGIQUE DU JOUR',
-            'titre': "Prospection Directe - Bureau d'Études / Major du BTP",
-            'lien': "https://www.linkedin.com",
-            'texte': response.choices[0].message.content
-        }
+        resultat = response.choices[0].message.content
+        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{resultat}"
     except:
-        return None
+        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n⚠️ IA indisponible. Foncez voir le lien !"
 
-async def analyser_opportunite(item):
-    """Analyse personnalisée par Mistral"""
-    prompt = f"Opportunité : {item['titre']}. Contenu : {item['texte']}. Prépare une accroche courte et experte pour vendre mes services d'ingénieur structure."
-    try:
-        response = client.chat.complete(model="mistral-tiny", messages=[{"role": "user", "content": prompt}])
-        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n{response.choices[0].message.content}"
-    except:
-        return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n(Analyse IA indisponible)"
+# --- EXÉCUTION PRINCIPALE ---
 
 async def executer_radar():
-    print(f"🚀 Sniper V4.1 (Correctif Telegram) lancé...")
+    print(f"🚀 Lancement du Radar Turbo V3...")
     
-    # 1. Collecte des données
-    missions_reelles = scanner_flux_rss()
-    prospect_ia = await generer_prospect_ia()
+    # On vide le filet et on le remplit avec les 5 moteurs
+    toutes_les_missions = (scanner_marches_publics() + 
+                           scanner_upwork() + 
+                           scanner_jooble() + 
+                           scanner_freework_btp() + 
+                           scanner_reseau_linkedin())
     
-    data = missions_reelles
-    if prospect_ia:
-        data.append(prospect_ia)
+    if not toutes_les_missions:
+        toutes_les_missions = [{
+            'source': '💡 TEST SYSTÈME',
+            'titre': 'Expert Structure - Audit Express',
+            'lien': 'http://google.com',
+            'texte': 'Vérification périodique du radar. Tout est OK.'
+        }]
 
-    # 2. Envoi des messages UN PAR UN (évite les bugs de limite et de Markdown)
-    await bot.send_message(chat_id=str(CHAT_ID), text="🏗️ **NOUVEAU RAPPORT RADAR BTP** 🏗️", parse_mode='Markdown')
+    # Construction du message pour Telegram
+    header = "🏗️ **RADAR BUSINESS : ÉDITION TURBO** 🏗️\n\n"
     
-    for opport in data:
-        try:
-            analyse = await analyser_opportunite(opport)
-            # On envoie chaque opportunité dans sa propre bulle Telegram
-            await bot.send_message(
-                chat_id=str(CHAT_ID), 
-                text=analyse, 
-                parse_mode='Markdown'
-            )
-            print(f"✅ Message envoyé pour : {opport['titre'][:30]}")
-            await asyncio.sleep(1) # Petite pause pour respecter les limites de Telegram
-        except Exception as e:
-            print(f"⚠️ Erreur d'envoi pour une opportunité : {e}")
-            # En cas d'erreur Markdown, on envoie en texte brut pour ne rien rater
-            await bot.send_message(chat_id=str(CHAT_ID), text=f"Lien : {opport['lien']}\n(Erreur de formatage sur cette fiche)")
-
-    print("✅ Session terminée !")
+    # Pour chaque mission trouvée, on analyse et on envoie
+    for m in toutes_les_missions:
+        rapport = await analyser_opportunite(m)
+        await bot.send_message(chat_id=str(CHAT_ID), text=f"{header}{rapport}", parse_mode='Markdown')
+        await asyncio.sleep(1) # Sécurité anti-spam
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
