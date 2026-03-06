@@ -70,27 +70,36 @@ async def analyser_opportunite(item):
         return f"**{item['source']}**\n📌 {item['titre']}\n🔗 {item['lien']}\n\n(Analyse IA indisponible)"
 
 async def executer_radar():
-    print(f"🚀 Sniper V4 (RSS + LeadGen) lancé...")
+    print(f"🚀 Sniper V4.1 (Correctif Telegram) lancé...")
     
-    # 1. On cherche les missions réelles via RSS
+    # 1. Collecte des données
     missions_reelles = scanner_flux_rss()
-    
-    # 2. On génère toujours une cible stratégique pour ne pas repartir les mains vides
     prospect_ia = await generer_prospect_ia()
     
-    # On combine tout
     data = missions_reelles
     if prospect_ia:
         data.append(prospect_ia)
 
-    message_final = "🏗️ **RADAR BUSINESS : ÉDITION V4** 🏗️\n\n"
+    # 2. Envoi des messages UN PAR UN (évite les bugs de limite et de Markdown)
+    await bot.send_message(chat_id=str(CHAT_ID), text="🏗️ **NOUVEAU RAPPORT RADAR BTP** 🏗️", parse_mode='Markdown')
+    
     for opport in data:
-        analyse = await analyser_opportunite(opport)
-        message_final += f"{analyse}\n\n──────────────\n\n"
-        await asyncio.sleep(1)
+        try:
+            analyse = await analyser_opportunite(opport)
+            # On envoie chaque opportunité dans sa propre bulle Telegram
+            await bot.send_message(
+                chat_id=str(CHAT_ID), 
+                text=analyse, 
+                parse_mode='Markdown'
+            )
+            print(f"✅ Message envoyé pour : {opport['titre'][:30]}")
+            await asyncio.sleep(1) # Petite pause pour respecter les limites de Telegram
+        except Exception as e:
+            print(f"⚠️ Erreur d'envoi pour une opportunité : {e}")
+            # En cas d'erreur Markdown, on envoie en texte brut pour ne rien rater
+            await bot.send_message(chat_id=str(CHAT_ID), text=f"Lien : {opport['lien']}\n(Erreur de formatage sur cette fiche)")
 
-    await bot.send_message(chat_id=str(CHAT_ID), text=message_final[:4000], parse_mode='Markdown')
-    print("✅ Rapport V4 envoyé !")
+    print("✅ Session terminée !")
 
 if __name__ == "__main__":
     asyncio.run(executer_radar())
