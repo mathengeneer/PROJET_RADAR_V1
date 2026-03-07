@@ -154,6 +154,7 @@ async def analyser_opportunite(item):
 async def executer_radar():
     print(f"🚀 Lancement du Radar Scan Complet...")
     
+    # Récupération des données
     data = (
         scanner_marches_publics() + 
         scanner_upwork() + 
@@ -162,25 +163,30 @@ async def executer_radar():
         scanner_archeologue_btp()
     )
     
-    if not data:
-        data = [{'source': '💡 TEST', 'titre': 'Aucun résultat', 'lien': 'http://google.com', 'texte': 'Scan terminé.'}]
-
+    # Préparation du rapport
     message_final = "🏗️ **RAPPORT RADAR BTP** 🏗️\n\n"
     
-    for opport in data[:5]: # On limite à 5 résultats pour rester sous les 4000
-        analyse = await analyser_opportunite(opport)
-        # On ajoute une sécurité pour ne pas dépasser la taille autorisée
-        ajout = f"{analyse}\n\n──────────────\n\n"
-        if len(message_final) + len(ajout) < 3800:
-            message_final += ajout
-        else:
-            break
+    if not data:
+        message_final += "Aucune nouvelle opportunité détectée lors de ce cycle."
+    else:
+        for opport in data[:5]: # On prend les 5 meilleurs
+            analyse_result = await analyser_opportunite(opport)
+            # Ajout de sécurité : si l'analyse est vide, on force un affichage minimal
+            if not analyse_result:
+                analyse_result = f"📌 {opport['titre']}\n🔗 {opport['lien']}\n⚠️ Analyse IA indisponible, consultez le lien directement."
+            
+            ajout = f"{analyse_result}\n\n──────────────\n\n"
+            if len(message_final) + len(ajout) < 3800:
+                message_final += ajout
+            else:
+                break
 
-    # Envoi avec une gestion d'erreur plus souple
+    # Envoi final sécurisé
     try:
+        # On tente l'envoi avec Markdown
         await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
-    except Exception as e:
-        # Si le Markdown bloque, on réessaie sans parse_mode
+    except Exception:
+        # Si le Markdown échoue (souvent à cause de caractères spéciaux dans les liens), on envoie en texte simple
         await bot.send_message(chat_id=str(CHAT_ID), text=message_final)
     
     print("✅ Rapport envoyé !")
