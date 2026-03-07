@@ -154,7 +154,6 @@ async def analyser_opportunite(item):
 async def executer_radar():
     print(f"🚀 Lancement du Radar Scan Complet...")
     
-    # On combine TOUTES les sources
     data = (
         scanner_marches_publics() + 
         scanner_upwork() + 
@@ -164,22 +163,26 @@ async def executer_radar():
     )
     
     if not data:
-        data = [{
-            'source': '💡 TEST SYSTÈME',
-            'titre': 'Ingénieur Structure',
-            'lien': 'http://google.com',
-            'texte': 'Test du radar complet.'
-        }]
+        data = [{'source': '💡 TEST', 'titre': 'Aucun résultat', 'lien': 'http://google.com', 'texte': 'Scan terminé.'}]
 
-    message_final = "🏗️ **RADAR BTP : RAPPORT ARCHÉOLOGUE** 🏗️\n\n"
+    message_final = "🏗️ **RAPPORT RADAR BTP** 🏗️\n\n"
     
-    # On traite les 6 premières opportunités pour ne pas surcharger
-    for opport in data[:6]:
+    for opport in data[:5]: # On limite à 5 résultats pour rester sous les 4000
         analyse = await analyser_opportunite(opport)
-        message_final += f"{analyse}\n\n──────────────\n\n"
-        await asyncio.sleep(1)
+        # On ajoute une sécurité pour ne pas dépasser la taille autorisée
+        ajout = f"{analyse}\n\n──────────────\n\n"
+        if len(message_final) + len(ajout) < 3800:
+            message_final += ajout
+        else:
+            break
 
-    await bot.send_message(chat_id=str(CHAT_ID), text=message_final[:4000], parse_mode='Markdown')
+    # Envoi avec une gestion d'erreur plus souple
+    try:
+        await bot.send_message(chat_id=str(CHAT_ID), text=message_final, parse_mode='Markdown')
+    except Exception as e:
+        # Si le Markdown bloque, on réessaie sans parse_mode
+        await bot.send_message(chat_id=str(CHAT_ID), text=message_final)
+    
     print("✅ Rapport envoyé !")
 
 if __name__ == "__main__":
